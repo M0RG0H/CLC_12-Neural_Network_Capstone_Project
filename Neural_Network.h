@@ -11,6 +11,7 @@
 #include <fstream>
 #include <ctime>
 #include <cstdlib>
+#include <iomanip>
 
 
 using namespace std;
@@ -29,7 +30,7 @@ class NeuralNetwork
         vector<vector<vector<double>>> weights;
         vector<vector<double>> biases;
 
-        double trainingRate = 0.005;
+        double trainingRate;
 
 
         double sigmoid(double x);
@@ -41,7 +42,6 @@ class NeuralNetwork
         void updateWeightsAndBiases(vector<vector<vector<double>>> wGradient, vector<vector<double>> bGradient);
 
         vector<double> str_to_double_vec(const string& tmps);
-        vector<string> str_to_str_vec(const string& tmpss);
 
         double random_double() const;
 
@@ -58,7 +58,8 @@ class NeuralNetwork
 
         vector<double> runNetwork(digit example);
 
-        void train(vector<digit> trainingExamples, double trainingRate = 0.005);
+        void train(vector<digit> trainingExamples, double trainingR);
+        void train(vector<digit> trainingExamples);
 
         ~NeuralNetwork();
 };
@@ -191,33 +192,19 @@ vector<double> NeuralNetwork::str_to_double_vec(const string& tmps)
     return v;
 }
 
-vector<string> NeuralNetwork::str_to_str_vec(const string& tmpss)
-{
-    vector<string> v;
-
-    string tmps;
-
-    for (char c : tmpss) {
-        if (c == '/') {
-            v.push_back(tmps);
-            tmps.clear();
-        } else {
-            tmps += c;
-        }
-    }
-
-    return v;
-}
-
 double NeuralNetwork::random_double() const
 {
     double d = 0;
 
     if (rand() % 2 == 0) {
-        d += rand() % 10;
+        d += static_cast<double>(rand() % 100);
     } else {
-        d -= rand() % 10;
+        d -= static_cast<double>(rand() % 100);
     }
+
+    double d2 = static_cast<double>(1) / (static_cast<double>(rand() % 5) + static_cast<double>(10));
+
+    d *= d2;
 
     return d;
 }
@@ -227,7 +214,7 @@ double NeuralNetwork::random_double() const
 //
 
 NeuralNetwork::NeuralNetwork(vector<int> topology, string savetofilename)
-: topology(topology), filename(savetofilename)
+: filename(savetofilename), topology(topology)
 {
     srand(time(nullptr));
 
@@ -269,12 +256,15 @@ NeuralNetwork::NeuralNetwork(string filename)
 
     string tmp;
 
-    for (char c : top) {
-        if (c == ' ') {
+    for (int i = 0; i < top.size(); i++) {
+        if (top[i] == ' ') {
             topology.push_back(stoi(tmp));
             tmp.clear();
+        } else if (i == top.size() - 1) {
+            tmp += top[i];
+            topology.push_back(stoi(tmp));
         } else {
-            tmp += c;
+            tmp += top[i];
         }
     }
 
@@ -286,32 +276,86 @@ NeuralNetwork::NeuralNetwork(string filename)
     string wghts;
     getline(file, wghts);
 
-    string tmpss;
+    vector<string> v;
+    string temp;
+    int layerIdx = 1;
+    int countSpaces = 0;
 
-    for (char c : wghts) {
-        if (c == '$') {
-            vector<vector<double>> v;
-            vector<string> t = str_to_str_vec(tmpss);
-
-            for (auto s : t) {
-                v.push_back(str_to_double_vec(s));
+    for (int i = 0; i < wghts.size(); i++) {
+        if (wghts[i] == ' ') {
+            countSpaces++;
+            if (countSpaces == (topology[layerIdx] * topology[layerIdx - 1])) {
+                countSpaces = 0;
+                layerIdx++;
+                v.push_back(temp);
+                temp.clear();
+                continue;
             }
-
-            weights.push_back(v);
-            tmpss.clear();
+            temp += wghts[i];
+        } else if (i == wghts.size() - 1) {
+            temp += wghts[i];
+            v.push_back(temp);
         } else {
-            tmpss += c;
+            temp += wghts[i];
         }
+    }
+
+
+
+    for (auto& s : v) {
+        vector<vector<double>> v2;
+
+        string temp2;
+        int layerIdx2 = 0;
+        int countSpaces2 = 0;
+
+        for (int i = 0; i < s.size(); i++) {
+            if (s[i] == ' ') {
+                countSpaces2++;
+                if (countSpaces2 == topology[layerIdx2]) {
+                    countSpaces2 = 0;
+                    layerIdx++;
+                    v2.push_back(str_to_double_vec(temp2));
+                    temp2.clear();
+                    continue;
+                }
+                temp2 += s[i];
+            } else if (i == s.size() - 1) {
+                temp2 += s[i];
+                v2.push_back(str_to_double_vec(temp2));
+            } else {
+                temp2 += s[i];
+            }
+        }
+
+        weights.push_back(v2);
     }
 
 
     string biass;
     getline(file, biass);
 
-    vector<string> s = str_to_str_vec(biass);
+    string temp3;
+    int layerIdx3 = 1;
+    int countSpaces3 = 0;
 
-    for (auto ss : s) {
-        biases.push_back(str_to_double_vec(ss));
+    for (int i = 0; i < biass.size(); i++) {
+        if (biass[i] == ' ') {
+            countSpaces3++;
+            if (countSpaces3 == topology[layerIdx3]) {
+                countSpaces3 = 0;
+                layerIdx3++;
+                biases.push_back(str_to_double_vec(temp3));
+                temp3.clear();
+                continue;
+            }
+            temp3 += biass[i];
+        } else if (i == biass.size() - 1) {
+            temp3 += biass[i];
+            biases.push_back(str_to_double_vec(temp3));
+        } else {
+            temp3 += biass[i];
+        }
     }
 
     file.close();
@@ -328,9 +372,9 @@ vector<double> NeuralNetwork::runNetwork(digit example)
     return layers[topology.size() - 1];
 }
 
-void NeuralNetwork::train(vector<digit> trainingExamples, double trainingRate = 0.005)
+void NeuralNetwork::train(vector<digit> trainingExamples, double trainingR)
 {
-    trainingRate = trainingRate;
+    trainingRate = trainingR;
 
     vector<vector<vector<double>>> wG(topology.size() - 1);
     vector<vector<double>> bG(topology.size() - 1);
@@ -369,13 +413,14 @@ void NeuralNetwork::train(vector<digit> trainingExamples, double trainingRate = 
     }
 }
 
+void NeuralNetwork::train(vector<digit> trainingExamples)
+{
+    train(trainingExamples, 0.005);
+}
+
 NeuralNetwork::~NeuralNetwork()
 {
-    ofstream file(filename);
-
-    if (file.fail()) {
-        throw runtime_error("System failed to create file: " + filename);
-    }
+    ofstream file("/home/owen_n/CMPT_135/1PersonalProjects/Capstone Project/" + filename);
 
     for (int i = 0; i < topology.size(); i++) {
         file << topology[i];
@@ -389,17 +434,11 @@ NeuralNetwork::~NeuralNetwork()
     for (int i = 0; i < weights.size(); i++) {
         for (int j = 0; j < weights[i].size(); j++) {
             for (int k = 0; k < weights[i][j].size(); k++) {
-                file << weights[i][j][k];
+                file << fixed << setprecision(10) << weights[i][j][k];
                 if (k != weights[i][j].size() - 1) {
                     file << " ";
                 }
             }
-            if (j != weights[i].size() - 1) {
-                file << "/";
-            }
-        }
-        if (i != weights.size() - 1) {
-            file << "$";
         }
     }
     file << "\n";
@@ -407,13 +446,10 @@ NeuralNetwork::~NeuralNetwork()
 
     for (int i = 0; i < biases.size(); i++) {
         for (int j = 0; j < biases[i].size(); j++) {
-            file << biases[i][j];
-            if (j != biases[i].size()) {
+            file << fixed << setprecision(10) << biases[i][j];
+            if (j != biases[i].size() - 1) {
                 file << " ";
             }
-        }
-        if (i != biases.size()) {
-            file << "/";
         }
     }
 
